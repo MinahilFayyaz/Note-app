@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:note_app/boxes/box.dart';
+import 'package:note_app/crud_operations.dart';
 import 'package:note_app/models/note_model.dart';
 import 'package:note_app/notify_services.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:percent_indicator/circular_percent_indicator.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -54,33 +56,23 @@ class _MyHomePageState extends State<MyHomePage> {
   TextEditingController controllerTime = TextEditingController();
 
   late String msg;
+  Color? tileColor= Colors.white;
+  List<Map> status = [
+    {"isChecked": false},
+  ];
 
-  /*late FlutterLocalNotificationsPlugin localNotification;
-
-  @override
-  void initState(){
-    super.initState();
-    var androidInitialize = const AndroidInitializationSettings('ic_launcher');
-    var iosInitialize= const IOSInitializationSettings();
-    var initializationSettings= InitializationSettings(
-      android: androidInitialize, iOS: iosInitialize);
-    localNotification= FlutterLocalNotificationsPlugin();
-    localNotification.initialize(initializationSettings);
+  double progress = 0.0;
+  currentProgressColor() {
+    if (progress >= 0.0 && progress <= 0.4) {
+      return Colors.red;
+    }
+    if(progress > 0.4 && progress <= 0.7 ){
+      return Colors.orange;
+    }
+    else{
+      return Colors.blue;
+    }
   }
-
-  Future _showNotification() async{
-    var androidDetails= const AndroidNotificationDetails(
-        "channelId",
-        "Local Notification",
-        "Notification Description",
-    importance: Importance.high);
-
-    var iosDetails= const IOSNotificationDetails();
-    var generalNotificationDetais= NotificationDetails(android: androidDetails, iOS: iosDetails);
-    await localNotification.show(0, "Hello ", 'notify you', generalNotificationDetais);
-
-  }*/
-
 
   @override
   Widget build(BuildContext context) {
@@ -88,47 +80,118 @@ class _MyHomePageState extends State<MyHomePage> {
       appBar: AppBar(
         title: Text(widget.title),
       ),
-      body: ValueListenableBuilder<Box<NoteModel>>(
-        valueListenable: Boxes.getData().listenable(),
-        builder: (context, box, _){
-          var data= box.values.toList().cast<NoteModel>();
-          return ListView.builder(
-            itemCount: box.length,
-            reverse: true,
-            shrinkWrap: true,
-            itemBuilder: (BuildContext context, int index){
-              return Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(data[index].title.toString(), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w400),),
-                          const Spacer(),
-                          InkWell(
-                            onTap: (){
-                              delete(data[index]);
-                            },child: const Icon(Icons.delete,size: 25.0,),
-                          ),
-                          InkWell(
-                            onTap: (){
-                              _editDialog(data[index], data[index].title.toString(), data[index].description.toString(), data[index].date.toString(), data[index].time.toString());
-                            },child: const Icon(Icons.edit, size: 25.0,),
-                          ),
-                        ],
-                      ),
-                      Text(data[index].description.toString(), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w400),),
-                      Text(data[index].date.toString(), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w400),),
-                    ],
+      body:
+
+      Column(
+        children: [
+          Center(
+              child: Container(
+                margin: const EdgeInsets.only(top: 50.0),
+                child: CircularPercentIndicator(
+                  radius: 100,
+                  lineWidth: 20,
+                  percent: progress,
+                  animation: true,
+                  animationDuration: 1000,
+                  animateFromLastPercent: true,
+                  progressColor: currentProgressColor(),
+                  backgroundColor: Colors.blue.shade100,
+                  circularStrokeCap: CircularStrokeCap.round,
+                  center: const Icon(Icons.task_alt_rounded, size: 50, color: Colors.blue,
                   ),
+
                 ),
-              );
-            },
-          );
-        },
+              )),
+          const SizedBox(height: 50,),
+          Container(
+            margin: const EdgeInsets.only(top: 15.0),
+            child: ValueListenableBuilder<Box<NoteModel>>(
+              valueListenable: Boxes.getData().listenable(),
+              builder: (context, box, _){
+                var data= box.values.toList().cast<NoteModel>();
+                return ListView.builder(
+                  itemCount: box.length,
+                  reverse: true,
+                  shrinkWrap: true,
+                  itemBuilder: (BuildContext context, int index){
+                    return GestureDetector(
+                      onDoubleTap:(){
+                         Navigator.push(context, MaterialPageRoute(builder: (context) => const CrudOperations()),);
+                      } ,
+
+                      child: Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(10.0),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.start,
+                            children:
+                            status.map((key) {
+                                  return CheckboxListTile(
+                                    controlAffinity: ListTileControlAffinity.leading,
+                                    value: key["isChecked"],
+                                    tileColor: tileColor,
+                                    title: Text(data[index].title.toString(), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600),),
+                                    subtitle: Text(data[index].description.toString(), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600),),
+                                    onChanged: (value) {
+
+                                      setState(() {
+                                          key["isChecked"] = value;
+                                          if(key["isChecked"]== true){
+                                            final updated = ((progress + 0.1).clamp(0.0, 1.0) * 100);
+                                            tileColor = Colors.blue.shade200;
+                                            progress = updated.round() / 100;
+                                          }
+                                          else{
+                                            final updated = ((progress - 0.1).clamp(0.0, 1.0) * 100);
+                                            tileColor = Colors.white;
+                                            progress = updated.round() / 100;
+                                          }
+                                        });
+                                    },
+
+                                  );
+                              }).toList(),
+                          ),
+                        ),
+                      ),
+                      /*
+                      ListTile(
+                                     leading: Checkbox(
+                                      value: status[key],
+                                   onChanged: (bool? value) {
+                                        setState(() {
+                                          status[key]= value!;
+                                        });
+                                   },
+                                ),
+                            title: Text(data[index].title.toString(), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600),),
+                            subtitle: Text(data[index].description.toString(), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600),),
+                               );
+
+                      child :Padding(
+                        padding: const EdgeInsets.all(10.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.start,
+                          children: [
+                            CheckboxListTile(value: is_Checked,
+                              controlAffinity: ListTileControlAffinity.leading,
+                              title : Text(data[index].title.toString(), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w400),),
+                              subtitle : Text(data[index].description.toString(), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w400),),
+                                onChanged: (value){
+                              setState(() {
+                                is_Checked = value!;
+                              });
+                            }),
+                          ],
+                        ),
+                      ),*/
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: ()async{
@@ -137,83 +200,6 @@ class _MyHomePageState extends State<MyHomePage> {
         tooltip: 'Add a Note',
         child: const Icon(Icons.add),
       ), // This trailing comma makes auto-formatting nicer for build methods.
-    );
-  }
-
-  void delete(NoteModel noteModel) async {
-
-    await noteModel.delete();
-  }
-
-  Future<void> _editDialog(NoteModel noteModel, String title, String description, var date, var time)async {
-
-    controllerTitle.text = title;
-    controllerDescription.text = description;
-    controllerDate.text = date;
-    controllerTime.text= time;
-
-    return showDialog(
-        context: context,
-        builder: (context) {
-          return AlertDialog(
-            title: const Text('Edit Note'),
-            content: SingleChildScrollView(
-              child: Column(
-                children: [
-                  TextFormField(
-                    controller: controllerTitle,
-                    decoration: const InputDecoration(
-                        hintText: 'Enter a Title',
-                        border: OutlineInputBorder()
-                    ),
-                  ),
-                  const SizedBox(height: 20,),
-                  TextFormField(
-                    controller: controllerDescription,
-                    decoration: const InputDecoration(
-                        hintText: 'Enter a Note',
-                        border: OutlineInputBorder()
-                    ),
-                  ),
-                  const SizedBox(height: 20,),
-                  TextFormField(
-                    controller: controllerDate,
-                    decoration: const InputDecoration(
-                        hintText: 'Enter a Date',
-                        border: OutlineInputBorder()
-                    ),
-                  ),
-                  const SizedBox(height: 20,),
-                  TextFormField(
-                    controller: controllerTime,
-                    decoration: const InputDecoration(
-                        hintText: 'Enter a Time',
-                        border: OutlineInputBorder()
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(onPressed: () {
-                Navigator.pop(context);
-              }, child: const Text("Cancel")),
-              TextButton(onPressed: () {
-
-                noteModel.title= controllerTitle.text.toString();
-                noteModel.description= controllerDescription.text.toString();
-                noteModel.date= controllerDate.text.toString();
-                noteModel.time= controllerTime.text.toString();
-
-                noteModel.save();
-                controllerTitle.clear();
-                controllerDescription.clear();
-                //_showNotification();
-                Navigator.pop(context);
-              }, child: const Text("Edit Note"))
-            ],
-          );
-        }
     );
   }
 
@@ -320,4 +306,3 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 }
-
